@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ProductPrepaid {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  name         String
+  category     String
+  brand        String
+  buyPrice     Float
+  markupPrice  Float    @default(300)
+  sellPrice    Float
+  serverStatus String   @default("Tersedia")
+  lastUpdate   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+}
+
+model Transaction {
+  id             String   @id @default(uuid())
+  merchantRef    String   @unique
+  tripayTrxId    String?
+  qrisTrxId      String?
+  customerPhone  String
+  targetAccount  String
+  productCode    String
+  productName    String
+  amount         Float
+  qrisUrl        String?
+  paymentStatus  String   @default("UNPAID")
+  deliveryStatus String   @default("PENDING")
+  sn             String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
