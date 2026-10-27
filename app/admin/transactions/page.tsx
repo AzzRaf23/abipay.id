@@ -1,13 +1,23 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Clock, Download } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Download, AlertTriangle } from "lucide-react";
 
 export const revalidate = 0;
 
 export default async function AdminTransactionsPage() {
-  const transactions = await prisma.transaction.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  let transactions: any[] = [];
+  let dbError: boolean = false;
+
+  // Bungkus query Prisma dengan try...catch agar Vercel tidak crash jika DB belum terkoneksi
+  try {
+    transactions = await prisma.transaction.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error("Gagal mengambil data transaksi di Vercel DB:", error);
+    dbError = true;
+    transactions = []; // Fallback array kosong agar halaman tetap berhasil di-render
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 md:p-10 space-y-6">
@@ -39,6 +49,16 @@ export default async function AdminTransactionsPage() {
         </div>
       </div>
 
+      {/* Warning Alert kalau database belum ke-connect / bermasalah */}
+      {dbError && (
+        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-xl text-xs flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-400" />
+          <div>
+            <strong>Pemberitahuan Database:</strong> Gagal terhubung ke database. Pastikan <code>DATABASE_URL</code> di Vercel Environment Variables sudah terkonfigurasi dengan benar.
+          </div>
+        </div>
+      )}
+
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
@@ -57,7 +77,7 @@ export default async function AdminTransactionsPage() {
               {transactions.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-500">
-                    Belum ada data transaksi yang masuk.
+                    {dbError ? "Menunggu koneksi database..." : "Belum ada data transaksi yang masuk."}
                   </td>
                 </tr>
               ) : (
@@ -73,7 +93,7 @@ export default async function AdminTransactionsPage() {
                     <td className="p-4 font-bold text-white">{trx.productName}</td>
                     <td className="p-4 font-mono text-slate-200">{trx.targetAccount}</td>
                     <td className="p-4 font-bold text-emerald-400">
-                      Rp {trx.amount.toLocaleString("id-ID")}
+                      Rp {trx.amount?.toLocaleString("id-ID") ?? 0}
                     </td>
                     <td className="p-4">
                       {trx.paymentStatus === "PAID" ? (

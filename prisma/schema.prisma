@@ -3,27 +3,29 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql" // Ubah ke "postgresql" jika menggunakan Neon Tech
   url      = env("DATABASE_URL")
 }
 
 model ProductPrepaid {
-  id           String   @id @default(uuid())
-  code         String   @unique
+  id           String        @id @default(uuid())
+  code         String        @unique
   name         String
   category     String
   brand        String
   buyPrice     Float
-  markupPrice  Float    @default(300)
+  markupPrice  Float         @default(300)
   sellPrice    Float
-  serverStatus String   @default("Tersedia")
-  lastUpdate   DateTime @updatedAt
-  createdAt    DateTime @default(now())
+  serverStatus String        @default("Tersedia")
+  lastUpdate   DateTime      @updatedAt
+  createdAt    DateTime      @default(now())
+
+  transactions Transaction[]
 }
 
 model Transaction {
-  id             String   @id @default(uuid())
-  merchantRef    String   @unique
+  id             String          @id @default(uuid())
+  merchantRef    String          @unique
   tripayTrxId    String?
   qrisTrxId      String?
   customerPhone  String
@@ -31,10 +33,12 @@ model Transaction {
   productCode    String
   productName    String
   amount         Float
-  qrisUrl        String?
-  paymentStatus  String   @default("UNPAID")
-  deliveryStatus String   @default("PENDING")
+  qrisUrl        String?        @db.Text
+  paymentStatus  String          @default("UNPAID")
+  deliveryStatus String          @default("PENDING")
   sn             String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  product        ProductPrepaid? @relation(fields: [productCode], references: [code])
 }
