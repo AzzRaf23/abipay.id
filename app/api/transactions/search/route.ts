@@ -1,49 +1,33 @@
+export const dynamic = 'force-static';
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
-}
-
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
-    const body = await req.json();
+    const { searchParams } = new URL(req.url);
+    const key = searchParams.get("key");
 
-    const merchantRef = body.merchantRef || `INV-${Date.now()}`;
-    const productName = body.productName || "Top Up Game";
-    const targetAccount = body.targetAccount || body.userId || "-";
-    const customerPhone = body.customerPhone || "-";
-    const amount = Number(body.amount) || 0;
-    const paymentStatus = body.paymentStatus || "PAID";
-    const deliveryStatus = body.deliveryStatus || "PROCESSING";
+    if (!key) {
+      return NextResponse.json({ success: false, message: "Kata kunci tidak boleh kosong" }, { status: 400 });
+    }
 
-    const newTransaction = await prisma.transaction.create({
-      data: {
-        merchantRef,
-        productName,
-        targetAccount,
-        customerPhone,
-        amount,
-        paymentStatus,
-        deliveryStatus,
+    // Cari berdasarkan merchantRef ATAU customerPhone
+    const transaction = await prisma.transaction.findFirst({
+      where: {
+        OR: [
+          { merchantRef: key },
+          { customerPhone: key },
+        ],
       },
+      orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(
-      { success: true, data: newTransaction },
-      { headers: corsHeaders }
-    );
+    if (!transaction) {
+      return NextResponse.json({ success: false, message: "Transaksi tidak ditemukan" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data: transaction });
   } catch (error: any) {
-    console.error("Error create transaction:", error);
-    return NextResponse.json(
-      { success: false, message: error?.message || "Gagal memproses transaksi" },
-      { status: 500, headers: corsHeaders }
-    );
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }
