@@ -18,15 +18,16 @@ import {
   Clock,
   Download,
   Share2,
+  Loader2,
 } from "lucide-react";
 
 const diamondItems = [
-  { id: 1, name: "86 Diamonds", price: "Rp 23.500", bonus: "+8 Bonus", isPopular: false },
-  { id: 2, name: "172 Diamonds", price: "Rp 46.800", bonus: "+16 Bonus", isPopular: true },
-  { id: 3, name: "257 Diamonds", price: "Rp 69.900", bonus: "+23 Bonus", isPopular: false },
-  { id: 4, name: "344 Diamonds", price: "Rp 93.500", bonus: "+30 Bonus", isPopular: false },
-  { id: 5, name: "429 Diamonds", price: "Rp 116.000", bonus: "+39 Bonus", isPopular: false },
-  { id: 6, name: "706 Diamonds", price: "Rp 188.000", bonus: "+64 Bonus", isPopular: true },
+  { id: 1, name: "86 Diamonds", price: "23500", displayPrice: "Rp 23.500", bonus: "+8 Bonus", isPopular: false },
+  { id: 2, name: "172 Diamonds", price: "46800", displayPrice: "Rp 46.800", bonus: "+16 Bonus", isPopular: true },
+  { id: 3, name: "257 Diamonds", price: "69900", displayPrice: "Rp 69.900", bonus: "+23 Bonus", isPopular: false },
+  { id: 4, name: "344 Diamonds", price: "93500", displayPrice: "Rp 93.500", bonus: "+30 Bonus", isPopular: false },
+  { id: 5, name: "429 Diamonds", price: "116000", displayPrice: "Rp 116.000", bonus: "+39 Bonus", isPopular: false },
+  { id: 6, name: "706 Diamonds", price: "188000", displayPrice: "Rp 188.000", bonus: "+64 Bonus", isPopular: true },
 ];
 
 const paymentMethods = [
@@ -60,10 +61,12 @@ export default function CheckoutPage() {
   const [selectedPayment, setSelectedPayment] = useState("qris");
   const [whatsapp, setWhatsapp] = useState("081234567890");
 
-  // State Modals
+  // State Modals & Loading
   const [showQrisModal, setShowQrisModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(900); // 15 Menit Countdown
+  const [createdInvoice, setCreatedInvoice] = useState("");
 
   // Countdown Timer Effect
   useEffect(() => {
@@ -88,9 +91,43 @@ export default function CheckoutPage() {
     setShowQrisModal(true);
   };
 
-  const handleSimulatePaymentSuccess = () => {
-    setShowQrisModal(false);
-    setShowSuccessModal(true);
+  const handleSimulatePaymentSuccess = async () => {
+    setIsSubmitting(true);
+    const generatedInvoice = `INV-MLBB-${Date.now()}`;
+
+    try {
+      const payload = {
+        merchantRef: generatedInvoice,
+        productName: `Mobile Legends - ${selectedItem.name}`,
+        targetAccount: `${userId} (${zoneId})`,
+        customerPhone: whatsapp,
+        amount: Number(selectedItem.price),
+        paymentStatus: "PAID",
+        deliveryStatus: "PROCESSING",
+      };
+
+      // Simpan transaksi baru ke backend Neon DB melalui endpoint rewrite lokal
+      const res = await fetch("/api/transactions/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+
+      if (result.success || res.ok) {
+        setCreatedInvoice(generatedInvoice);
+        setShowQrisModal(false);
+        setShowSuccessModal(true);
+      } else {
+        alert("Gagal membuat transaksi: " + (result.message || "Terjadi kesalahan"));
+      }
+    } catch (error) {
+      console.error("Gagal simpan transaksi:", error);
+      alert("Terjadi kesalahan koneksi saat memproses transaksi.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -191,7 +228,7 @@ export default function CheckoutPage() {
                       <p className="text-xs font-bold text-white">{item.name}</p>
                       <p className="text-[10px] text-emerald-400 font-medium mt-0.5">{item.bonus}</p>
                       <p className={`text-xs font-extrabold mt-3 ${isSelected ? "text-[#00A3FF]" : "text-white"}`}>
-                        {item.price}
+                        {item.displayPrice}
                       </p>
                     </button>
                   );
@@ -298,13 +335,13 @@ export default function CheckoutPage() {
 
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-bold text-white">Total Bayar:</span>
-                  <span className="font-black text-base text-[#00A3FF]">{selectedItem.price}</span>
+                  <span className="font-black text-base text-[#00A3FF]">{selectedItem.displayPrice}</span>
                 </div>
               </div>
 
               <button
                 onClick={handlePayNow}
-                className="w-full py-3 bg-[#00A3FF] hover:bg-blue-600 text-white font-bold text-xs md:text-sm rounded-xl transition-all shadow-lg shadow-[#00A3FF]/25 flex items-center justify-center gap-2 mt-2"
+                className="w-full py-3 bg-[#00A3FF] hover:bg-blue-600 text-white font-bold text-xs md:text-sm rounded-xl transition-all shadow-lg shadow-[#00A3FF]/25 flex items-center justify-center gap-2 mt-2 cursor-pointer"
               >
                 Bayar Sekarang <ArrowRight className="w-4 h-4" />
               </button>
@@ -346,14 +383,13 @@ export default function CheckoutPage() {
 
             {/* QR CODE DISPLAY */}
             <div className="bg-white p-4 rounded-2xl border-4 border-[#00A3FF]/30 shadow-inner my-2">
-              {/* Dummy QR Code Pattern */}
               <div className="w-48 h-48 bg-slate-900 rounded-lg p-2 flex flex-col justify-between items-center relative overflow-hidden">
                 <div className="w-full flex justify-between">
                   <div className="w-12 h-12 border-4 border-white bg-black"></div>
                   <div className="w-12 h-12 border-4 border-white bg-black"></div>
                 </div>
                 <div className="text-white text-[10px] font-black tracking-widest bg-black px-2 py-1 rounded border border-white">
-                  REVO.ID QRIS
+                  ABIPAY.ID QRIS
                 </div>
                 <div className="w-full flex justify-between">
                   <div className="w-12 h-12 border-4 border-white bg-black"></div>
@@ -364,20 +400,30 @@ export default function CheckoutPage() {
 
             <div className="w-full bg-[#0B0F17] border border-[#334155] rounded-xl p-3 mt-3 flex items-center justify-between text-xs">
               <span className="text-[#94A3B8]">Total Tagihan:</span>
-              <span className="font-extrabold text-[#00A3FF] text-base">{selectedItem.price}</span>
+              <span className="font-extrabold text-[#00A3FF] text-base">{selectedItem.displayPrice}</span>
             </div>
 
             {/* ACTION BUTTONS SIMULASI */}
             <div className="w-full flex flex-col gap-2 mt-5">
               <button
                 onClick={handleSimulatePaymentSuccess}
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                disabled={isSubmitting}
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <CheckCircle2 className="w-4 h-4" /> Simulasi Bayar Sekarang
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Menyimpan Transaksi...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" /> Simulasi Bayar Sekarang
+                  </>
+                )}
               </button>
               <button
                 onClick={() => setShowQrisModal(false)}
-                className="w-full py-2.5 bg-[#0B0F17] border border-[#334155] text-[#94A3B8] hover:text-white font-medium text-xs rounded-xl"
+                disabled={isSubmitting}
+                className="w-full py-2.5 bg-[#0B0F17] border border-[#334155] text-[#94A3B8] hover:text-white font-medium text-xs rounded-xl cursor-pointer"
               >
                 Batalkan Pesanan
               </button>
@@ -405,7 +451,7 @@ export default function CheckoutPage() {
               <div className="flex justify-between border-b border-[#334155] pb-2">
                 <span className="text-[#94A3B8]">No. Invoice:</span>
                 <span className="font-mono font-bold text-white flex items-center gap-1">
-                  REV-2026101299 <Copy className="w-3 h-3 text-[#00A3FF] cursor-pointer" />
+                  {createdInvoice} <Copy className="w-3 h-3 text-[#00A3FF] cursor-pointer" />
                 </span>
               </div>
               <div className="flex justify-between">
@@ -426,24 +472,24 @@ export default function CheckoutPage() {
               </div>
               <div className="flex justify-between border-t border-[#334155] pt-2 font-bold">
                 <span className="text-[#94A3B8]">Total Pembayaran:</span>
-                <span className="text-[#00A3FF] text-sm">{selectedItem.price}</span>
+                <span className="text-[#00A3FF] text-sm">{selectedItem.displayPrice}</span>
               </div>
             </div>
 
             {/* ACTION BUTTONS */}
             <div className="w-full grid grid-cols-2 gap-3 mt-5">
               <Link
-                href="/dashboard"
+                href="/admin/transactions"
                 className="py-3 bg-[#00A3FF] hover:bg-blue-600 text-white font-bold text-xs rounded-xl transition-all text-center flex items-center justify-center gap-1.5 shadow-md shadow-[#00A3FF]/20"
               >
-                Cek Transaksi
+                Cek Admin Transaksi
               </Link>
-              <Link
-                href="/"
-                className="py-3 bg-[#0B0F17] border border-[#334155] text-white hover:bg-slate-800 font-bold text-xs rounded-xl transition-all text-center"
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="py-3 bg-[#0B0F17] border border-[#334155] text-white hover:bg-slate-800 font-bold text-xs rounded-xl transition-all text-center cursor-pointer"
               >
                 Beli Lagi
-              </Link>
+              </button>
             </div>
           </div>
         </div>

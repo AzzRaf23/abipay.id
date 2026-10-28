@@ -11,46 +11,28 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-export async function GET(req: Request) {
+export async function POST(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const key = searchParams.get("key");
+    const body = await req.json();
 
-    // Jika key kosong (dipanggil dari dashboard admin):
-    if (!key) {
-      const allTransactions = await prisma.transaction.findMany({
-        orderBy: { createdAt: "desc" },
-      });
-
-      return NextResponse.json(
-        { success: true, data: allTransactions },
-        { headers: corsHeaders }
-      );
-    }
-
-    // Jika key ada (dipanggil saat cari invoice/telepon):
-    const transaction = await prisma.transaction.findFirst({
-      where: {
-        OR: [
-          { merchantRef: key },
-          { customerPhone: key },
-        ],
+    const newTransaction = await prisma.transaction.create({
+      data: {
+        merchantRef: body.merchantRef || `INV-${Date.now()}`,
+        productName: body.productName,
+        targetAccount: body.targetAccount,
+        amount: Number(body.amount),
+        customerPhone: body.customerPhone || "-",
+        paymentStatus: body.paymentStatus || "UNPAID",
+        deliveryStatus: body.deliveryStatus || "PENDING",
       },
-      orderBy: { createdAt: "desc" },
     });
 
-    if (!transaction) {
-      return NextResponse.json(
-        { success: false, message: "Transaksi tidak ditemukan" },
-        { status: 404, headers: corsHeaders }
-      );
-    }
-
     return NextResponse.json(
-      { success: true, data: transaction },
+      { success: true, data: newTransaction },
       { headers: corsHeaders }
     );
   } catch (error: any) {
+    console.error("Gagal membuat transaksi di Neon DB:", error);
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 500, headers: corsHeaders }

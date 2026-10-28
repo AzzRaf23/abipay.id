@@ -4,17 +4,12 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  async headers() {
+  async rewrites() {
     return [
       {
-        // Mengizinkan semua route API diakses dari mana saja (CORS)
+        // Semua request ke /api/... di localhost akan diteruskan langsung ke Vercel di belakang layar
         source: "/api/:path*",
-        headers: [
-          { key: "Access-Control-Allow-Credentials", value: "true" },
-          { key: "Access-Control-Allow-Origin", value: "*" },
-          { key: "Access-Control-Allow-Methods", value: "GET,DELETE,PATCH,POST,PUT,OPTIONS" },
-          { key: "Access-Control-Allow-Headers", value: "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization" },
-        ],
+        destination: "https://abipay-id-4ic7-bsrdddrhk-lionheart1.vercel.app/api/:path*",
       },
     ];
   },

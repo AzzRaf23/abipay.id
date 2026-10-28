@@ -15,6 +15,7 @@ import {
   X,
   CheckCircle2,
   UserCheck,
+  Loader2,
 } from "lucide-react";
 
 interface CheckoutContentProps {
@@ -22,7 +23,7 @@ interface CheckoutContentProps {
 }
 
 // ----------------------------------------------------------------------
-// HELPER COMPONENT FORM STEPS (Dipisah ke luar agar input ID tidak lag)
+// HELPER COMPONENT FORM STEPS
 // ----------------------------------------------------------------------
 interface FormStepsProps {
   layoutType: string;
@@ -134,7 +135,7 @@ function FormSteps({
             type="button"
             onClick={onCheckNickname}
             disabled={checkingNick}
-            className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 disabled:opacity-50"
+            className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
           >
             <UserCheck className="w-3.5 h-3.5" />
             {checkingNick ? "Mengecek ID..." : "Cek Nickname"}
@@ -143,7 +144,9 @@ function FormSteps({
           {nickname && (
             <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Akun: <strong className="text-white">{nickname}</strong></span>
+              <span>
+                Akun: <strong className="text-white">{nickname}</strong>
+              </span>
             </div>
           )}
         </div>
@@ -188,7 +191,7 @@ function FormSteps({
                 key={item.id}
                 type="button"
                 onClick={() => setSelectedItem(item)}
-                className={`relative p-4 rounded-xl border text-left transition-all ${
+                className={`relative p-4 rounded-xl border text-left transition-all cursor-pointer ${
                   layoutType === "hero-slider" ? "min-w-[150px] shrink-0" : ""
                 }`}
                 style={{
@@ -256,7 +259,7 @@ function FormSteps({
           <button
             type="button"
             onClick={() => setSelectedPayment("qris")}
-            className="flex items-center justify-between p-3.5 rounded-xl border transition-all"
+            className="flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer"
             style={{
               backgroundColor:
                 selectedPayment === "qris"
@@ -288,7 +291,7 @@ function FormSteps({
           <button
             type="button"
             onClick={() => setSelectedPayment("dana")}
-            className="flex items-center justify-between p-3.5 rounded-xl border transition-all"
+            className="flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer"
             style={{
               backgroundColor:
                 selectedPayment === "dana"
@@ -345,6 +348,7 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
   const [qrisUrl, setQrisUrl] = useState("");
   const [loadingPay, setLoadingPay] = useState(false);
   const [simulating, setSimulating] = useState(false);
+  const [createdInvoice, setCreatedInvoice] = useState("");
 
   useEffect(() => {
     const activeTheme = applyActiveTheme();
@@ -373,6 +377,13 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
     return `${mins.toString().padStart(2, "0")}:${secs
       .toString()
       .padStart(2, "0")}`;
+  };
+
+  // Helper untuk membersihkan string harga ke angka murni (misal: "Rp 23.500" -> 23500)
+  const parseNumericPrice = (priceStr: string | number): number => {
+    if (typeof priceStr === "number") return priceStr;
+    if (!priceStr) return 0;
+    return Number(priceStr.replace(/[^0-9]/g, "")) || 0;
   };
 
   // HANDLER CEK NICKNAME ID GAME
@@ -424,7 +435,7 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           productName: `${product.title} - ${selectedItem?.name}`,
-          amount: selectedItem?.price,
+          amount: parseNumericPrice(selectedItem?.price),
           userId: userId,
           zoneId: zoneId,
           customerPhone: "08123456789",
@@ -456,27 +467,42 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
     }
   };
 
-  // HANDLER SIMULASI BAYAR (SIMPAN KE DATABASE SQLITE)
+  // HANDLER SIMULASI BAYAR (MENYIMPAN DENGAN SUKSES KE DATABASE POSTGRESQL NEON VIA VERCEL)
   const handleSimulatePayment = async () => {
     setSimulating(true);
+    const invoiceNum = `INV-${slug.toUpperCase()}-${Date.now()}`;
 
     try {
-      await fetch("/api/transactions/create", {
+      const numericAmount = parseNumericPrice(selectedItem?.price);
+
+      const res = await fetch("/api/transactions/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          merchantRef: invoiceNum,
           productName: `${product.title} - ${selectedItem?.name}`,
-          amount: selectedItem?.price,
-          targetAccount: userId + (zoneId ? ` (${zoneId})` : ""),
+          amount: numericAmount,
+          targetAccount: `${userId}${zoneId ? ` (${zoneId})` : ""}`,
           customerPhone: "08123456789",
+          paymentStatus: "PAID",
+          deliveryStatus: "PROCESSING",
         }),
       });
+
+      const result = await res.json();
+
+      if (result.success || res.ok) {
+        setCreatedInvoice(invoiceNum);
+        setShowQrisModal(false);
+        setShowSuccessModal(true);
+      } else {
+        alert("Gagal menyimpan transaksi ke Neon DB: " + (result.message || "Error server"));
+      }
     } catch (error) {
-      console.error("Gagal simpan transaksi:", error);
+      console.error("Gagal simpan transaksi ke Vercel/Neon DB:", error);
+      alert("Terjadi kesalahan koneksi saat memproses pembayaran.");
     } finally {
       setSimulating(false);
-      setShowQrisModal(false);
-      setShowSuccessModal(true);
     }
   };
 
@@ -556,11 +582,18 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
       <button
         onClick={handlePayNow}
         disabled={loadingPay}
-        className="w-full py-3 text-white font-bold text-xs md:text-sm rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mt-2 hover:opacity-90 disabled:opacity-50"
+        className="w-full py-3 text-white font-bold text-xs md:text-sm rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mt-2 hover:opacity-90 disabled:opacity-50 cursor-pointer"
         style={{ backgroundColor: "var(--color-primary, #00A3FF)" }}
       >
-        {loadingPay ? "Memproses QRIS..." : "Bayar Sekarang"}{" "}
-        <ArrowRight className="w-4 h-4" />
+        {loadingPay ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" /> Memproses QRIS...
+          </>
+        ) : (
+          <>
+            Bayar Sekarang <ArrowRight className="w-4 h-4" />
+          </>
+        )}
       </button>
     </div>
   );
@@ -809,7 +842,7 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
           >
             <button
               onClick={() => setShowQrisModal(false)}
-              className="absolute top-4 right-4 p-1 rounded-lg border"
+              className="absolute top-4 right-4 p-1 rounded-lg border cursor-pointer"
               style={{
                 backgroundColor: "var(--color-input-bg, #0B0F17)",
                 borderColor: "var(--color-border, #334155)",
@@ -850,9 +883,15 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
             <button
               onClick={handleSimulatePayment}
               disabled={simulating}
-              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-lg mt-2 transition-all disabled:opacity-50"
+              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-lg mt-2 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
             >
-              {simulating ? "Menyimpan Transaksi..." : "Simulasi Bayar Sekarang"}
+              {simulating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Menyimpan Transaksi...
+                </>
+              ) : (
+                "Simulasi Bayar Sekarang"
+              )}
             </button>
           </div>
         </div>
@@ -881,6 +920,10 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
             >
               {selectedItem?.name} berhasil dikirim ke ID {userId}.
             </p>
+
+            <div className="bg-[#0B0F17] border border-[#334155] rounded-xl p-3 mt-4 text-xs font-mono text-blue-400">
+              No Invoice: {createdInvoice}
+            </div>
 
             <div className="w-full grid grid-cols-2 gap-3 mt-6">
               <Link

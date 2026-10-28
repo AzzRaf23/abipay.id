@@ -12,11 +12,12 @@ export default function AdminTransactionsPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string>("");
 
-  const fetchTransactions = async () => {
-    setLoading(true);
+  const fetchTransactions = async (isManual = false) => {
+    if (isManual) setLoading(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${API_BASE_URL}/api/transactions/search`);
+      // Fetch via endpoint lokal (yang di-rewrite oleh next.config.ts ke Vercel)
+      const res = await fetch("/api/transactions/search");
       const result = await res.json();
 
       if (result.success && Array.isArray(result.data)) {
@@ -35,7 +36,15 @@ export default function AdminTransactionsPage() {
   };
 
   useEffect(() => {
-    fetchTransactions();
+    // Fetch pertama kali saat halaman dimuat
+    fetchTransactions(true);
+
+    // Auto-refresh data transaksi secara real-time setiap 5 detik
+    const interval = setInterval(() => {
+      fetchTransactions(false);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -50,13 +59,13 @@ export default function AdminTransactionsPage() {
           </Link>
           <h1 className="text-2xl font-black text-white">Daftar Transaksi Abipay.id</h1>
           <p className="text-xs text-slate-400">
-            Monitoring pembayaran & status pengiriman real-time.
+            Monitoring pembayaran & status pengiriman real-time (Auto-sync 5d).
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
-            onClick={fetchTransactions}
+            onClick={() => fetchTransactions(true)}
             className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
@@ -101,7 +110,7 @@ export default function AdminTransactionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
-              {loading ? (
+              {loading && transactions.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-400 animate-pulse">
                     Memuat data transaksi real-time dari database...
