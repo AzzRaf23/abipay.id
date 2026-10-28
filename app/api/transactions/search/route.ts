@@ -15,15 +15,23 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
+    const merchantRef = body.merchantRef || `INV-${Date.now()}`;
+    const productName = body.productName || "Top Up Game";
+    const targetAccount = body.targetAccount || body.userId || "-";
+    const customerPhone = body.customerPhone || "-";
+    const amount = Number(body.amount) || 0;
+    const paymentStatus = body.paymentStatus || "PAID";
+    const deliveryStatus = body.deliveryStatus || "PROCESSING";
+
     const newTransaction = await prisma.transaction.create({
       data: {
-        merchantRef: body.merchantRef || `INV-${Date.now()}`,
-        productName: body.productName,
-        targetAccount: body.targetAccount,
-        amount: Number(body.amount),
-        customerPhone: body.customerPhone || "-",
-        paymentStatus: body.paymentStatus || "UNPAID",
-        deliveryStatus: body.deliveryStatus || "PENDING",
+        merchantRef,
+        productName,
+        targetAccount,
+        customerPhone,
+        amount,
+        paymentStatus,
+        deliveryStatus,
       },
     });
 
@@ -32,9 +40,9 @@ export async function POST(req: Request) {
       { headers: corsHeaders }
     );
   } catch (error: any) {
-    console.error("Gagal membuat transaksi di Neon DB:", error);
+    console.error("Error create transaction:", error);
     return NextResponse.json(
-      { success: false, message: error.message },
+      { success: false, message: error?.message || "Gagal memproses transaksi" },
       { status: 500, headers: corsHeaders }
     );
   }
