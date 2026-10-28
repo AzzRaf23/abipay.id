@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Header CORS reusable agar diizinkan diakses dari browser mana saja
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-// Handler untuk Preflight Request CORS
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
@@ -18,7 +16,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const key = searchParams.get("key");
 
-    // Jika TIDAK ADA 'key' (misal halaman admin minta semua data transaksi):
+    // Jika key kosong (dipanggil dari dashboard admin):
     if (!key) {
       const allTransactions = await prisma.transaction.findMany({
         orderBy: { createdAt: "desc" },
@@ -30,7 +28,7 @@ export async function GET(req: Request) {
       );
     }
 
-    // Jika ADA 'key' (fitur pencarian transaksi):
+    // Jika key ada (dipanggil saat cari invoice/telepon):
     const transaction = await prisma.transaction.findFirst({
       where: {
         OR: [
