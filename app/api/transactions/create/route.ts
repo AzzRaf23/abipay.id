@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -17,6 +19,7 @@ export async function POST(req: Request) {
 
     const merchantRef = body.merchantRef || `INV-${Date.now()}`;
     const productName = body.productName || "Top Up Game";
+    const productCode = body.productCode || body.productSlug || "MLBB-DIAMOND";
     const targetAccount = body.targetAccount || body.userId || "-";
     const customerPhone = body.customerPhone || "-";
     const amount = Number(body.amount) || 0;
@@ -27,6 +30,7 @@ export async function POST(req: Request) {
       data: {
         merchantRef,
         productName,
+        productCode,
         targetAccount,
         customerPhone,
         amount,
