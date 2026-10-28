@@ -1,62 +1,55 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  RefreshCw,
+  Search,
+  Zap,
+  Tag,
+  CheckCircle2,
+  AlertTriangle,
+  Loader2,
+} from "lucide-react";
 
-interface Product {
-  id: string;
-  code: string;
-  name: string;
-  category: string;
-  brand: string;
-  buyPrice: number;
-  markupPrice: number;
-  sellPrice: number;
-  serverStatus: string;
-}
+const brandsList = [
+  "SEMUA",
+  "Mobile Legends",
+  "Free Fire",
+  "Valorant",
+  "PUBG Mobile",
+  "Genshin Impact",
+  "Honkai: Star Rail",
+  "EA SPORTS FC Mobile",
+  "Honor of Kings",
+  "Roblox",
+  "Telkomsel",
+];
 
-export default function AdminPrepaidProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [search, setSearch] = useState("");
-  const [selectedBrand, setSelectedBrand] = useState("SEMUA");
-  const [loading, setLoading] = useState(false);
-  const [syncLoading, setSyncLoading] = useState(false);
-  const [markupValue, setMarkupValue] = useState(500);
+export default function PrepaidProductsAdminPage() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [syncing, setSyncing] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedBrand, setSelectedBrand] = useState<string>("SEMUA");
+  const [bulkMarkup, setBulkMarkup] = useState<string>("500");
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [editMarkupValue, setEditMarkupValue] = useState<string>("");
 
-  // Filter pilihan Brand persis sesuai Homepage Abipay.id
-  const homepageBrands = [
-    "SEMUA",
-    "Mobile Legends",
-    "Free Fire",
-    "Valorant",
-    "PUBG Mobile",
-    "Genshin Impact",
-    "Honkai: Star Rail",
-    "EA SPORTS FC Mobile",
-    "Honor of Kings",
-    "Roblox",
-    "Telkomsel",
-    "XL Axiata",
-    "Tri",
-    "Smartfren",
-    "PLN",
-    "DANA",
-    "OVO",
-    "GoPay",
-    "ShopeePay",
-    "Steam Wallet",
-    "Google Play",
-  ];
-
+  // Fetch daftar produk dari backend
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/products");
-      const data = await res.json();
-      if (data.success) {
-        setProducts(data.data || []);
+      const res = await fetch("/api/admin/prepaid-products");
+      const result = await res.json();
+      if (result.success && Array.isArray(result.data)) {
+        setProducts(result.data);
+      } else if (Array.isArray(result)) {
+        setProducts(result);
       }
     } catch (err) {
-      console.error("Gagal load produk Abipay:", err);
+      console.error("Gagal mengambil data produk:", err);
     } finally {
       setLoading(false);
     }
@@ -66,168 +59,278 @@ export default function AdminPrepaidProducts() {
     fetchProducts();
   }, []);
 
-  const handleSync = async () => {
-    setSyncLoading(true);
+  // Force Update & Mapping Sync ke Provider / Database
+  const handleForceSync = async () => {
+    setSyncing(true);
     try {
-      const res = await fetch("/api/admin/products/sync", { method: "POST" });
-      const data = await res.json();
-      alert(data.message || "Sync produk Abipay.id berhasil!");
-      fetchProducts();
-    } catch (err: any) {
-      alert("Gagal sync: " + err.message);
+      const res = await fetch("/api/admin/prepaid-products/sync", {
+        method: "POST",
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert("Berhasil memperbarui & memetakan seluruh produk PPOB!");
+        fetchProducts();
+      } else {
+        alert(result.message || "Gagal melakukan sync produk.");
+      }
+    } catch (err) {
+      console.error("Error force sync:", err);
+      alert("Terjadi kesalahan koneksi saat sync.");
     } finally {
-      setSyncLoading(false);
+      setSyncing(false);
     }
   };
 
-  const handleBulkMarkup = async () => {
-    if (!confirm(`Yakin ingin mengubah markup untuk brand ${selectedBrand} menjadi Rp ${markupValue}?`)) return;
+  // Terapkan Bulk Markup ke Semua Produk
+  const handleApplyBulkMarkup = async () => {
+    const markupNum = Number(bulkMarkup);
+    if (isNaN(markupNum) || markupNum < 0) {
+      alert("Masukkan angka markup yang valid!");
+      return;
+    }
 
+    setLoading(true);
     try {
-      const res = await fetch("/api/admin/products/bulk-markup", {
+      const res = await fetch("/api/admin/prepaid-products/bulk-markup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          brand: selectedBrand === "SEMUA" ? null : selectedBrand,
-          markupPrice: Number(markupValue),
-        }),
+        body: JSON.stringify({ markup: markupNum }),
       });
-      const data = await res.json();
-      alert(data.message || "Bulk markup berhasil diperbarui!");
-      fetchProducts();
-    } catch (err: any) {
-      alert("Gagal update markup: " + err.message);
+      const result = await res.json();
+      if (result.success) {
+        alert(`Markup Rp ${markupNum.toLocaleString("id-ID")} berhasil diterapkan ke SEMUA produk!`);
+        fetchProducts();
+      } else {
+        alert(result.message || "Gagal menerapkan bulk markup.");
+      }
+    } catch (err) {
+      console.error("Error bulk markup:", err);
+      alert("Gagal memperbarui markup secara massal.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const filteredProducts = products.filter((item) => {
-    const matchBrand = selectedBrand === "SEMUA" || item.brand === selectedBrand;
-    const matchSearch =
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.code.toLowerCase().includes(search.toLowerCase());
-    return matchBrand && matchSearch;
+  // Simpan Single Markup Per Produk
+  const handleSaveSingleMarkup = async (code: string) => {
+    const newMarkup = Number(editMarkupValue);
+    if (isNaN(newMarkup) || newMarkup < 0) {
+      alert("Masukkan markup yang valid!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/prepaid-products/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, markup: newMarkup }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setEditingCode(null);
+        fetchProducts();
+      } else {
+        alert(result.message || "Gagal mengupdate markup.");
+      }
+    } catch (err) {
+      console.error("Error single markup update:", err);
+    }
+  };
+
+  // Filter Produk berdasarkan Brand & Keyword Pencarian
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch =
+      p.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesBrand =
+      selectedBrand === "SEMUA" ||
+      (p.brand && p.brand.toLowerCase() === selectedBrand.toLowerCase());
+
+    return matchesSearch && matchesBrand;
   });
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 text-white p-6 rounded-xl shadow-md border border-slate-800">
+    <div className="min-h-screen bg-[#0B0F17] text-white p-6 md:p-10 space-y-6">
+      {/* HEADER SECTION */}
+      <div className="bg-[#1E293B] border border-[#334155] rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Abipay.id — Kelola Produk PPOB</h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <Link
+            href="/admin/transactions"
+            className="inline-flex items-center gap-2 text-xs font-bold text-[#00A3FF] hover:underline mb-2"
+          >
+            <ArrowLeft className="w-4 h-4" /> Kelola Transaksi
+          </Link>
+          <h1 className="text-2xl font-black text-white flex items-center gap-2">
+            Abipay.id — Kelola Produk PPOB
+          </h1>
+          <p className="text-xs text-[#94A3B8] mt-1">
             Atur harga jual & sinkronkan produk Tripay dengan 20 Brand Homepage
           </p>
         </div>
+
         <button
-          onClick={handleSync}
-          disabled={syncLoading}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition disabled:opacity-50"
+          onClick={handleForceSync}
+          disabled={syncing}
+          className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-blue-600/20 cursor-pointer disabled:opacity-50 shrink-0"
         >
-          {syncLoading ? "Mapping Data..." : "Force Update & Mapping"}
+          {syncing ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Syncing Database...
+            </>
+          ) : (
+            <>
+              <Zap className="w-4 h-4" /> Force Update & Mapping
+            </>
+          )}
         </button>
       </div>
 
-      {/* Control Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-sm text-white">
+      {/* FILTER & BULK MARKUP CONTROL */}
+      <div className="bg-[#1E293B] border border-[#334155] rounded-2xl p-5 grid grid-cols-1 md:grid-cols-3 gap-4 shadow-lg">
+        {/* CARI PRODUK */}
         <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1">CARI PRODUK</label>
-          <input
-            type="text"
-            placeholder="Cari kode atau nama..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="md:col-span-2 flex flex-col md:flex-row items-end gap-3">
-          <div className="w-full md:w-1/2">
-            <label className="block text-xs font-semibold text-slate-400 mb-1">BULK MARKUP (RP)</label>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#94A3B8] mb-1.5">
+            CARI PRODUK
+          </label>
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-3 text-[#94A3B8]" />
             <input
-              type="number"
-              value={markupValue}
-              onChange={(e) => setMarkupValue(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              type="text"
+              placeholder="Cari kode atau nama..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-[#0B0F17] border border-[#334155] rounded-xl pl-9 pr-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#00A3FF]"
             />
           </div>
-          <button
-            onClick={handleBulkMarkup}
-            className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
-          >
-            Terapkan Markup ({selectedBrand})
-          </button>
+        </div>
+
+        {/* BULK MARKUP */}
+        <div className="md:col-span-2">
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#94A3B8] mb-1.5">
+            BULK MARKUP (RP)
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              value={bulkMarkup}
+              onChange={(e) => setBulkMarkup(e.target.value)}
+              className="w-full bg-[#0B0F17] border border-[#334155] rounded-xl px-4 py-2.5 text-xs text-emerald-400 font-bold focus:outline-none focus:border-[#00A3FF]"
+            />
+            <button
+              onClick={handleApplyBulkMarkup}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition cursor-pointer shrink-0"
+            >
+              Terapkan Markup (SEMUA)
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Brand Pills Filter */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {homepageBrands.map((b) => (
-          <button
-            key={b}
-            onClick={() => setSelectedBrand(b)}
-            className={`px-4 py-2 text-xs font-bold rounded-full whitespace-nowrap transition ${
-              selectedBrand === b
-                ? "bg-blue-600 text-white shadow"
-                : "bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800"
-            }`}
-          >
-            {b}
-          </button>
-        ))}
+      {/* BRAND CATEGORY TABS */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {brandsList.map((brand) => {
+          const isActive = selectedBrand === brand;
+          return (
+            <button
+              key={brand}
+              onClick={() => setSelectedBrand(brand)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                isActive
+                  ? "bg-[#00A3FF] text-white shadow-md shadow-[#00A3FF]/20"
+                  : "bg-[#1E293B] border border-[#334155] text-[#94A3B8] hover:text-white"
+              }`}
+            >
+              {brand}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Table Products */}
-      <div className="bg-slate-900 rounded-xl border border-slate-800 shadow-sm overflow-hidden text-white">
+      {/* TABLE PRODUK PPOB */}
+      <div className="bg-[#1E293B] border border-[#334155] rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
-            <thead className="bg-slate-950 text-slate-400 uppercase text-xs font-bold border-b border-slate-800">
+          <table className="w-full text-left text-xs text-[#94A3B8]">
+            <thead className="bg-[#0B0F17] text-[#94A3B8] uppercase font-semibold text-[10px] tracking-wider border-b border-[#334155]">
               <tr>
-                <th className="p-4">Kode</th>
-                <th className="p-4">Nama Produk</th>
-                <th className="p-4">Brand (Homepage)</th>
-                <th className="p-4">Kategori</th>
-                <th className="p-4">Harga Modal</th>
-                <th className="p-4">Markup</th>
-                <th className="p-4">Harga Jual</th>
-                <th className="p-4">Status</th>
+                <th className="p-4">KODE</th>
+                <th className="p-4">NAMA PRODUK</th>
+                <th className="p-4">BRAND (HOMEPAGE)</th>
+                <th className="p-4">KATEGORI</th>
+                <th className="p-4">HARGA MODAL</th>
+                <th className="p-4">MARKUP</th>
+                <th className="p-4">HARGA JUAL</th>
+                <th className="p-4">STATUS</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 text-slate-300">
+            <tbody className="divide-y divide-[#334155]/60 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="text-center p-8 text-slate-500">
-                    Memuat data...
+                  <td colSpan={8} className="p-8 text-center text-[#94A3B8] animate-pulse">
+                    Memuat daftar produk PPOB...
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center p-8 text-slate-500">
-                    Tidak ada produk. Klik &quot;Force Update & Mapping&quot; untuk mengelompokkan data.
+                  <td colSpan={8} className="p-8 text-center text-[#94A3B8]">
+                    Tidak ada produk PPOB yang ditemukan.
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map((item) => (
-                  <tr key={item.code} className="hover:bg-slate-800/50 transition">
-                    <td className="p-4 font-mono font-bold text-white">{item.code}</td>
-                    <td className="p-4 font-medium">{item.name}</td>
-                    <td className="p-4 text-xs font-bold text-blue-400">{item.brand}</td>
-                    <td className="p-4 text-xs text-slate-400">{item.category}</td>
-                    <td className="p-4">Rp {item.buyPrice.toLocaleString("id-ID")}</td>
-                    <td className="p-4 text-emerald-400 font-semibold">+Rp {item.markupPrice.toLocaleString("id-ID")}</td>
-                    <td className="p-4 font-bold text-white">Rp {item.sellPrice.toLocaleString("id-ID")}</td>
-                    <td className="p-4">
-                      <span
-                        className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${
-                          item.serverStatus === "Tersedia"
-                            ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                            : "bg-rose-950 text-rose-400 border border-rose-800"
-                        }`}
-                      >
-                        {item.serverStatus}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                filteredProducts.map((p) => {
+                  const modalPrice = Number(p.price || p.priceModal || 0);
+                  const markup = Number(p.markup || 0);
+                  const sellingPrice = modalPrice + markup;
+
+                  return (
+                    <tr key={p.code} className="hover:bg-[#0B0F17]/40 transition">
+                      <td className="p-4 font-mono font-bold text-white">{p.code}</td>
+                      <td className="p-4 font-bold text-white">{p.name}</td>
+                      <td className="p-4 text-[#00A3FF] font-bold">{p.brand || "-"}</td>
+                      <td className="p-4 uppercase text-[10px] tracking-wider">{p.category || "GAME"}</td>
+                      <td className="p-4 font-mono text-white">
+                        Rp {modalPrice.toLocaleString("id-ID")}
+                      </td>
+                      <td className="p-4 font-mono text-emerald-400 font-bold">
+                        {editingCode === p.code ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              value={editMarkupValue}
+                              onChange={(e) => setEditMarkupValue(e.target.value)}
+                              className="w-20 bg-[#0B0F17] border border-[#00A3FF] rounded p-1 text-xs text-white"
+                            />
+                            <button
+                              onClick={() => handleSaveSingleMarkup(p.code)}
+                              className="bg-emerald-600 text-white px-2 py-1 rounded text-[10px]"
+                            >
+                              OK
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            onClick={() => {
+                              setEditingCode(p.code);
+                              setEditMarkupValue(String(markup));
+                            }}
+                            className="cursor-pointer hover:underline"
+                            title="Klik untuk ubah markup"
+                          >
+                            +Rp {markup.toLocaleString("id-ID")}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 font-mono font-black text-white">
+                        Rp {sellingPrice.toLocaleString("id-ID")}
+                      </td>
+                      <td className="p-4">
+                        <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[10px] font-bold">
+                          Tersedia
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
