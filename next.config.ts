@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "export", // <--- Tambahkan baris ini untuk static export
   typescript: {
-    // Memaksa Vercel tetap meloloskan build meskipun ada error/warning TypeScript
+    // Memaksa Vercel/Build tetap meloloskan build meskipun ada error/warning TypeScript
     ignoreBuildErrors: true,
   },
 };

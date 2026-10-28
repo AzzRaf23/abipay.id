@@ -1,22 +1,22 @@
+export const dynamic = "force-static";
+
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, Download, AlertTriangle } from "lucide-react";
-
-export const revalidate = 0;
 
 export default async function AdminTransactionsPage() {
   let transactions: any[] = [];
   let dbError: boolean = false;
 
-  // Bungkus query Prisma dengan try...catch agar Vercel tidak crash jika DB belum terkoneksi
+  // Bungkus query Prisma dengan try...catch agar build static tidak crash jika DB offline
   try {
     transactions = await prisma.transaction.findMany({
       orderBy: { createdAt: "desc" },
     });
   } catch (error) {
-    console.error("Gagal mengambil data transaksi di Vercel DB:", error);
+    console.error("Gagal mengambil data transaksi saat build static:", error);
     dbError = true;
-    transactions = []; // Fallback array kosong agar halaman tetap berhasil di-render
+    transactions = []; // Fallback array kosong agar halaman tetap berhasil di-render ke HTML statis
   }
 
   return (
@@ -49,12 +49,12 @@ export default async function AdminTransactionsPage() {
         </div>
       </div>
 
-      {/* Warning Alert kalau database belum ke-connect / bermasalah */}
+      {/* Warning Alert jika DB bermasalah atau saat mode static */}
       {dbError && (
         <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-xl text-xs flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 shrink-0 text-amber-400" />
           <div>
-            <strong>Pemberitahuan Database:</strong> Gagal terhubung ke database. Pastikan <code>DATABASE_URL</code> di Vercel Environment Variables sudah terkonfigurasi dengan benar.
+            <strong>Pemberitahuan Database:</strong> Gagal terhubung ke database. Pastikan <code>DATABASE_URL</code> sudah terkonfigurasi dengan benar.
           </div>
         </div>
       )}
