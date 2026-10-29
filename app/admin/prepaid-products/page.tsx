@@ -4,28 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  RefreshCw,
   Search,
   Zap,
-  Tag,
-  CheckCircle2,
-  AlertTriangle,
   Loader2,
 } from "lucide-react";
-
-const brandsList = [
-  "SEMUA",
-  "Mobile Legends",
-  "Free Fire",
-  "Valorant",
-  "PUBG Mobile",
-  "Genshin Impact",
-  "Honkai: Star Rail",
-  "EA SPORTS FC Mobile",
-  "Honor of Kings",
-  "Roblox",
-  "Telkomsel",
-];
 
 export default function PrepaidProductsAdminPage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -41,7 +23,9 @@ export default function PrepaidProductsAdminPage() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/prepaid-products");
+      const res = await fetch(`/api/admin/products?t=${Date.now()}`, {
+        cache: "no-store",
+      });
       const result = await res.json();
       if (result.success && Array.isArray(result.data)) {
         setProducts(result.data);
@@ -59,17 +43,29 @@ export default function PrepaidProductsAdminPage() {
     fetchProducts();
   }, []);
 
-  // Force Update & Mapping Sync ke Provider / Database
+  // Ambil daftar brand unik secara DINAMIS dari seluruh produk yang ada di database
+  const dynamicBrands = [
+    "SEMUA",
+    ...Array.from(
+      new Set(
+        products
+          .map((p) => p.brand)
+          .filter((brand): brand is string => Boolean(brand) && brand !== "-")
+      )
+    ).sort(),
+  ];
+
+  // Force Update & Mapping Sync
   const handleForceSync = async () => {
     setSyncing(true);
     try {
-      const res = await fetch("/api/admin/prepaid-products/sync", {
-        method: "POST",
+      const res = await fetch("/api/admin/products/reset", {
+        method: "GET",
       });
       const result = await res.json();
       if (result.success) {
-        alert("Berhasil memperbarui & memetakan seluruh produk PPOB!");
-        fetchProducts();
+        alert(result.message || "Berhasil memperbarui seluruh produk!");
+        await fetchProducts();
       } else {
         alert(result.message || "Gagal melakukan sync produk.");
       }
@@ -91,7 +87,7 @@ export default function PrepaidProductsAdminPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/prepaid-products/bulk-markup", {
+      const res = await fetch("/api/admin/products/bulk-markup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markup: markupNum }),
@@ -120,7 +116,7 @@ export default function PrepaidProductsAdminPage() {
     }
 
     try {
-      const res = await fetch("/api/admin/prepaid-products/update", {
+      const res = await fetch("/api/admin/products/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, markup: newMarkup }),
@@ -162,7 +158,7 @@ export default function PrepaidProductsAdminPage() {
             <ArrowLeft className="w-4 h-4" /> Kelola Transaksi
           </Link>
           <h1 className="text-2xl font-black text-white flex items-center gap-2">
-            Abipay.id — Kelola Produk PPOB
+            Abipay.id — Kelola Produk PPOB ({products.length} Item)
           </h1>
           <p className="text-xs text-[#94A3B8] mt-1">
             Atur harga jual & sinkronkan produk Tripay dengan 20 Brand Homepage
@@ -227,9 +223,9 @@ export default function PrepaidProductsAdminPage() {
         </div>
       </div>
 
-      {/* BRAND CATEGORY TABS */}
+      {/* DYNAMIC BRAND CATEGORY TABS */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {brandsList.map((brand) => {
+        {dynamicBrands.map((brand) => {
           const isActive = selectedBrand === brand;
           return (
             <button
@@ -278,9 +274,9 @@ export default function PrepaidProductsAdminPage() {
                 </tr>
               ) : (
                 filteredProducts.map((p) => {
-                  const modalPrice = Number(p.price || p.priceModal || 0);
-                  const markup = Number(p.markup || 0);
-                  const sellingPrice = modalPrice + markup;
+                  const modalPrice = Number(p.buyPrice || p.price || 0);
+                  const markup = Number(p.markupPrice || p.markup || 0);
+                  const sellingPrice = Number(p.sellPrice) || (modalPrice + markup);
 
                   return (
                     <tr key={p.code} className="hover:bg-[#0B0F17]/40 transition">
@@ -302,7 +298,7 @@ export default function PrepaidProductsAdminPage() {
                             />
                             <button
                               onClick={() => handleSaveSingleMarkup(p.code)}
-                              className="bg-emerald-600 text-white px-2 py-1 rounded text-[10px]"
+                              className="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] cursor-pointer"
                             >
                               OK
                             </button>
@@ -325,7 +321,7 @@ export default function PrepaidProductsAdminPage() {
                       </td>
                       <td className="p-4">
                         <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[10px] font-bold">
-                          Tersedia
+                          {p.serverStatus || "Tersedia"}
                         </span>
                       </td>
                     </tr>

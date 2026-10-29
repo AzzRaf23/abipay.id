@@ -4,38 +4,36 @@ import { prisma } from "@/lib/prisma";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { category, markupPrice } = body;
+    const { markup } = body;
 
-    const markup = Number(markupPrice);
-    if (isNaN(markup)) {
+    const markupNum = Number(markup);
+    if (isNaN(markupNum) || markupNum < 0) {
       return NextResponse.json(
-        { success: false, message: "Markup price harus berupa angka" },
+        { success: false, message: "Nilai markup massal tidak valid!" },
         { status: 400 }
       );
     }
 
-    const whereCondition = category === "SEMUA" || !category ? {} : { category };
-    const products = await prisma.productPrepaid.findMany({ where: whereCondition });
+    // Ambil semua produk lalu update markup dan hitung ulang harga jualnya
+    const products = await prisma.productPrepaid.findMany();
 
-    for (const prod of products) {
-      const newSellPrice = prod.buyPrice + markup;
+    for (const p of products) {
+      const buyPrice = Number(p.buyPrice);
       await prisma.productPrepaid.update({
-        where: { id: prod.id },
+        where: { code: p.code },
         data: {
-          markupPrice: markup,
-          sellPrice: newSellPrice,
+          markupPrice: markupNum,
+          sellPrice: buyPrice + markupNum,
         },
       });
     }
 
     return NextResponse.json({
       success: true,
-      message: `Berhasil mengupdate markup ${products.length} produk`,
+      message: `Markup massal berhasil diterapkan ke semua produk!`,
     });
   } catch (error: any) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
+    console.error("Error bulk markup:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

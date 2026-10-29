@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const deliveryStatus = body.deliveryStatus || "PROCESSING";
 
     // 1. Ambil input code yang dikirim dari frontend
-    let inputCode = body.productCode || body.productSlug || "MLBB";
+    let inputCode = body.productCode || body.productSlug || "MLBB-3";
 
     // 2. Cek apakah productCode tersebut terdaftar di database
     let existingProduct = await prisma.productPrepaid.findUnique({
@@ -43,14 +43,13 @@ export async function POST(req: Request) {
     if (!validProductCode) {
       const defaultProduct = await prisma.productPrepaid.create({
         data: {
-          code: "MLBB",
-          name: "Mobile Legends",
-          category: "GAME",
-          brand: "Moonton",
-          type: "TOPUP",
-          sellerName: "Abipay",
-          price: 20000,
-          buyerSkuCode: "MLBB-DIAMOND",
+          code: "MLBB-3",
+          name: "3 Diamonds",
+          category: "GAMES",
+          brand: "Mobile Legends",
+          buyPrice: 1200,
+          markupPrice: 500,
+          sellPrice: 1700,
         },
       });
       validProductCode = defaultProduct.code;

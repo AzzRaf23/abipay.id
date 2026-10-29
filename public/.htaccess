@@ -1,0 +1,30 @@
+Options -Indexes -MultiViews
+DirectoryIndex index.html
+
+ErrorDocument 404 /404.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Halaman statis tidak bisa menjalankan route Next.js.
+  # Semua /api diteruskan ke backend yang sudah jalan.
+  RewriteRule ^api/(.*)$ api-proxy.php?path=$1 [QSA,L]
+
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+
+  # /checkout dan /order/mlbb punya folder RSC sekaligus file .html.
+  # Sajikan file .html-nya, bukan isi folder.
+  RewriteCond %{REQUEST_FILENAME}.html -f
+  RewriteRule ^(.+?)/?$ $1.html [L]
+
+  RewriteCond %{REQUEST_FILENAME}/index.html -f
+  RewriteRule ^(.+?)/?$ $1/index.html [L]
+</IfModule>
+
+<IfModule mod_mime.c>
+  AddType application/javascript .js
+  AddType text/css .css
+  AddType font/woff2 .woff2
+  AddType image/svg+xml .svg
+</IfModule>
