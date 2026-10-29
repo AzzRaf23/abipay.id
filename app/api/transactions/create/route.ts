@@ -23,7 +23,8 @@ export async function POST(req: Request) {
     const customerPhone = body.customerPhone || "-";
     const amount = Number(body.amount) || 0;
     const paymentStatus = body.paymentStatus || "PAID";
-    const deliveryStatus = body.deliveryStatus || "PROCESSING";
+    // Status awal diatur ke PROCESSING, nanti otomatis di-update lewat background timeout
+    const deliveryStatus = "PROCESSING";
 
     // 1. Ambil input code yang dikirim dari frontend
     let inputCode = body.productCode || body.productSlug || "MLBB-3";
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
       validProductCode = defaultProduct.code;
     }
 
-    // 5. Simpan Transaksi dengan productCode yang terjamin valid
+    // 5. Simpan Transaksi dengan productCode yang terjamin valid & status awal PROCESSING
     const newTransaction = await prisma.transaction.create({
       data: {
         merchantRef,
@@ -68,6 +69,19 @@ export async function POST(req: Request) {
         deliveryStatus,
       },
     });
+
+    // 6. SIMULASI AUTOMATION BACKEND:
+    // Setelah 4 detik, asumsikan pengiriman item sukses dan update status ke SUCCESS di Neon DB
+    setTimeout(async () => {
+      try {
+        await prisma.transaction.update({
+          where: { merchantRef },
+          data: { deliveryStatus: "SUCCESS" },
+        });
+      } catch (err) {
+        console.error("Gagal update background status transaksi:", err);
+      }
+    }, 4000); // jeda 4 detik
 
     return NextResponse.json(
       { success: true, data: newTransaction },

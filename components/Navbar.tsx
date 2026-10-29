@@ -30,12 +30,6 @@ export default function Navbar() {
               <Search className="w-4 h-4 text-emerald-400" /> Lacak Pesanan
             </Link>
             <Link
-              href="/showcase"
-              className="flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors"
-            >
-              <LayoutGrid className="w-4 h-4 text-blue-400" /> Showcase
-            </Link>
-            <Link
               href="/login"
               className="text-xs font-semibold text-slate-300 hover:text-white transition-colors"
             >

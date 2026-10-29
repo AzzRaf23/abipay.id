@@ -4,9 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, Download, AlertTriangle, RefreshCw } from "lucide-react";
 
-// Domain Backend Vercel milikmu
-const API_BASE_URL = "https://abipay-id-4ic7-bsrdddrhk-lionheart1.vercel.app";
-
 export default function AdminTransactionsPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -16,7 +13,6 @@ export default function AdminTransactionsPage() {
     if (isManual) setLoading(true);
     setErrorMsg("");
     try {
-      // Fetch via endpoint lokal (yang di-rewrite oleh next.config.ts ke Vercel)
       const res = await fetch("/api/transactions/search");
       const result = await res.json();
 
@@ -29,7 +25,7 @@ export default function AdminTransactionsPage() {
       }
     } catch (err) {
       console.error("Gagal mengambil data transaksi:", err);
-      setErrorMsg("Gagal terhubung ke API Vercel.");
+      setErrorMsg("Gagal terhubung ke API database lokal.");
     } finally {
       setLoading(false);
     }
@@ -59,7 +55,7 @@ export default function AdminTransactionsPage() {
           </Link>
           <h1 className="text-2xl font-black text-white">Daftar Transaksi Abipay.id</h1>
           <p className="text-xs text-slate-400">
-            Monitoring pembayaran & status pengiriman real-time (Auto-sync 5d).
+            Monitoring pembayaran & status pengiriman real-time (Auto-sync 5s).
           </p>
         </div>
 
@@ -76,7 +72,7 @@ export default function AdminTransactionsPage() {
           </span>
 
           <a
-            href={`${API_BASE_URL}/api/transactions/export`}
+            href="/api/transactions/export"
             target="_blank"
             rel="noreferrer"
             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition"
@@ -90,7 +86,7 @@ export default function AdminTransactionsPage() {
         <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-xl text-xs flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 shrink-0 text-amber-400" />
           <div>
-            <strong>Pemberitahuan API:</strong> {errorMsg} (Pastikan database Neon di Vercel sudah aktif).
+            <strong>Pemberitahuan API:</strong> {errorMsg} (Pastikan database Neon terhubung).
           </div>
         </div>
       )}

@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   UserCheck,
   Loader2,
+  Copy,
 } from "lucide-react";
 
 interface CheckoutContentProps {
@@ -379,7 +380,6 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
       .padStart(2, "0")}`;
   };
 
-  // Helper untuk membersihkan string harga ke angka murni (misal: "Rp 23.500" -> 23500)
   const parseNumericPrice = (priceStr: string | number): number => {
     if (typeof priceStr === "number") return priceStr;
     if (!priceStr) return 0;
@@ -434,7 +434,7 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productName: `${product.title} - ${selectedItem?.name}`,
+          productName: `${product.title}\n${selectedItem?.name}`,
           amount: parseNumericPrice(selectedItem?.price),
           userId: userId,
           zoneId: zoneId,
@@ -467,7 +467,7 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
     }
   };
 
-  // HANDLER SIMULASI BAYAR (MENYIMPAN DENGAN SUKSES KE DATABASE POSTGRESQL NEON VIA VERCEL)
+  // HANDLER SIMULASI BAYAR
   const handleSimulatePayment = async () => {
     setSimulating(true);
     const invoiceNum = `INV-${slug.toUpperCase()}-${Date.now()}`;
@@ -480,7 +480,7 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchantRef: invoiceNum,
-          productName: `${product.title} - ${selectedItem?.name}`,
+          productName: `${product.title}\n${selectedItem?.name}`,
           amount: numericAmount,
           targetAccount: `${userId}${zoneId ? ` (${zoneId})` : ""}`,
           customerPhone: "08123456789",
@@ -506,7 +506,6 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
     }
   };
 
-  // HELPER KOMPONEN RINGKASAN PESANAN
   const SummaryBox = () => (
     <div
       className="border rounded-2xl p-5 md:p-6 sticky top-20 shadow-xl flex flex-col gap-4 transition-colors duration-300"
@@ -618,7 +617,7 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
             <ArrowLeft className="w-4 h-4" /> Kembali ke Katalog Produk
           </Link>
 
-          {/* DYNAMIC HEADER BANNER WITH PRODUCT LOGO */}
+          {/* DYNAMIC HEADER BANNER */}
           <div
             className={`relative overflow-hidden rounded-2xl border p-6 mb-6 transition-colors duration-300 ${
               layoutType === "hero-slider"
@@ -675,7 +674,7 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
             </div>
           </div>
 
-          {/* RENDER DYNAMIC LAYOUT VARIATIONS */}
+          {/* LAYOUT VARIATIONS */}
           {(layoutType === "default" ||
             layoutType === "vip-executive" ||
             layoutType === "amoled-flat" ||
@@ -890,7 +889,7 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
                   <Loader2 className="w-4 h-4 animate-spin" /> Menyimpan Transaksi...
                 </>
               ) : (
-                "Simulasi Bayar Sekarang"
+                "Bayar Sekarang"
               )}
             </button>
           </div>
@@ -921,21 +920,32 @@ export default function CheckoutContent({ slug }: CheckoutContentProps) {
               {selectedItem?.name} berhasil dikirim ke ID {userId}.
             </p>
 
-            <div className="bg-[#0B0F17] border border-[#334155] rounded-xl p-3 mt-4 text-xs font-mono text-blue-400">
-              No Invoice: {createdInvoice}
+            {/* KOTAK INVOICE DENGAN FITUR COPY */}
+            <div
+              onClick={() => {
+                navigator.clipboard.writeText(createdInvoice);
+                alert("Nomor invoice berhasil disalin!");
+              }}
+              className="bg-[#0B0F17] border border-[#334155] rounded-xl p-3.5 mt-4 flex items-center justify-center gap-2 cursor-pointer hover:border-blue-500 transition group text-left"
+            >
+              <div>
+                <span className="text-[10px] text-slate-400 block text-center">No. Invoice (Klik untuk salin)</span>
+                <span className="text-xs font-mono font-bold text-blue-400">{createdInvoice}</span>
+              </div>
+              <Copy className="w-4 h-4 text-slate-400 group-hover:text-white transition shrink-0" />
             </div>
 
             <div className="w-full grid grid-cols-2 gap-3 mt-6">
               <Link
-                href="/admin/transactions"
-                className="py-3 text-white font-bold text-xs rounded-xl text-center shadow-md transition-all hover:opacity-90"
+                href={`/order/success?invoice=${createdInvoice}`}
+                className="py-3 text-white font-bold text-xs rounded-xl text-center shadow-md transition-all hover:opacity-90 flex items-center justify-center"
                 style={{ backgroundColor: "var(--color-primary, #00A3FF)" }}
               >
                 Cek Transaksi
               </Link>
               <Link
                 href="/"
-                className="py-3 border text-white font-bold text-xs rounded-xl text-center transition-all"
+                className="py-3 border text-white font-bold text-xs rounded-xl text-center transition-all flex items-center justify-center"
                 style={{
                   backgroundColor: "var(--color-input-bg, #0B0F17)",
                   borderColor: "var(--color-border, #334155)",
